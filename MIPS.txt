@@ -1,0 +1,284 @@
+-----------------------------------------
+The structure of the mips file:
+   .data
+      var1: .word 5
+      table:
+         Label1
+         Label2
+
+   .text
+      jal Main
+      li $v0 10   # syscall: exit
+      syscall
+
+      Main:
+          ...
+
+      _print:   # prints the input integer in $a0 and a new line
+         li $v0 1   # syscall: print integer
+         syscall
+         la $a0 _newline   # address of string in memory
+         li $v0 4   # syscall: print string
+         syscall
+         jr $ra
+
+      _error:   # prints the input string in $a0 for the error and exits
+         li $v0 4   # syscall: print string
+         syscall
+         li $v0 10  # syscall: exit
+         syscall
+
+      _heapAlloc:     # allocates the input number of memory locations in $a0 and returns a pointer to it
+         li $v0 9   # syscall: sbrk
+         syscall    # address in $v0
+         jr $ra
+
+    .data
+        .align 0
+        _newline: .asciiz "\n"
+        _str0: .asciiz "null pointer\n"
+
+-----------------------------------------
+Common instructions:
+   li $s1, 5   # load immediate
+      load immediate value into destination register
+
+   la reg, label   # load address
+      load address of the label to the register
+
+   move reg1, reg2
+      copy the value of reg1 to reg2
+      
+   lw $t2, ($t0)   # load word
+   lw $t2, 4($t0)
+      load word at $t0 to $t2
+      load word at ($t0 + 4) to $t2      
+   sw reg, label   # store word
+   sw $t2 ($t0)
+   sw $t2 4($t0)
+      store word reg to location label
+
+   jal label   # jump and link
+      copy program counter (return address) to register $ra
+      jump to program statement at label
+   jalr reg   # jump to reg and link
+      copy program counter (return address) to register $ra
+      jump to program statement at the address in reg
+   j label   #  jump
+      jump to label
+   jr reg   # jump register
+      jump to address in reg
+   beqz reg, label   # branch if equal to zero
+      branch to label if the value reg is zero
+   bnez reg, label   # branch if not equal to zero
+      branch to label if the value reg is not zero
+
+   add $t0, $t1, $t2   # add
+      $t0 = $t1 + $t2    It adds as signed (2's complement) integers
+   sub $t2, $t3, $t4   # subtract
+      $t2 = $t3 - $t4
+   addi $t2, $t3, 5   # add immediate
+      $t2 = $t3 + 5
+   addu $t1, $t6, $t7   # add as unsigned integers
+      $t1 = $t6 + $t7
+   subu reg1, reg2, reg3   # subtract as unsigned integers
+      reg1 = reg2 - reg3
+   addiu $t, $s, imm
+      Adds $s and a sign-extended immediate value and stores the result in $t
+   mult reg1, reg2    # multiply
+      multiply 32-bit quantities in reg1 and reg2, and store 64-bit
+      result in special registers Hi and Lo: (HI, LO) = reg1 * reg2
+      HI and LO are special registers used to store the result of multiplication and division. They are separate from the general purpose registers. They are not directly addressable and their contents are accessed with special instructions mfhi and mflo (Move From HI and LO).
+   slt $t2, $t1, $t0   # set on less than
+      If $t1 is less than $t0, $t2 is set to one. It gets zero otherwise.
+
+-----------------------------------------
+The stack grows from higher addresses down to lower addresses.  
+
+Higher address
+
+                              ----------------------
+                              |
+                              ----------------------
+                              |
+                 $fp ->   | In / Caller Out
+-------------------------------------------------
+                              | ra
+                              ----------------------
+                              | fp
+                              ----------------------
+                              |
+                              | Local
+                              ----------------------
+                              |
+                 $sp ->   | Out / Callee In
+-------------------------------------------------
+                              | ra
+                              ----------------------
+                              | fp
+                              ----------------------
+        
+                              Callee frame
+        
+Lower address
+
+
+
+Higher address
+
+                              ----------------------
+                              |
+             $fp_1 ->   |  In / Caller Out
+                              ----------------------
+                              |  ra
+                              ----------------------
+                              |  fp
+                              ----------------------
+                              |
+                              |  Local
+                              ----------------------
+                              |
+$sp_1$, $fp_2 ->   |  In / Caller Out
+-------------------------------------------------
+                              |  ra
+                              ----------------------
+                              |  fp_1
+                              ----------------------
+                              |
+                              |  Local
+                              ----------------------
+                              |
+             $sp_2 ->   |  Out
+-------------------------------------------------
+                              |  ra
+                              ----------------------
+                              |  fp
+                              ----------------------
+
+Lower address
+
+
+---------------------------------------------------
+Note that each word is 4 bytes and literals below should be multiplied by 4.
+
+On entry to a function
+   Save $fp to location $sp - 2
+   Move $fp to point to where $sp is pointing
+   Pushing the frame
+      Decrease $sp by size = Local + Out + 2
+         1 for Return address
+         1 for frame pointer
+   Saving the return register $ra at $fp - 1 (if the function calls any other function)
+      Note that $fp now holds the old $sp
+
+On exit from a function
+   Restoring the return register $ra (if the function calls any other function) from $fp - 1
+   Restore $fp from $fp - 2
+   Popping the frame
+      Increasing $sp by size = Local + Out + 2
+   Jumping to the return register $ra
+
+---------------------------------------------------
+int f (int p1, int p2) {
+    int x, y;
+    
+    x = p1 + p2;
+    
+    y = g (p2, p1, x);
+    
+    return y;
+}
+
+---------------------------------------------------
+Register allocation:
+    x -> $s0
+    y -> $s1
+
+func f [in 2, out 3, local 2]
+    # start of prologue
+
+    local[0] = $s0
+    local[1] = $s1
+
+    # end of prologue
+    # ----------------------
+    
+    # start of body
+    $s0 = $a0 + $a1
+
+    in[0] = $a0
+    in[1] = $a1
+    $a0 = in[1]
+    $a1 = in[0]
+    $a2 = $s0
+    call g
+    $s1 = $v0
+
+    # end of body
+    
+    # ----------------------
+    # start of epilogue
+    $v0 = $s1
+    $s0 = local[0]
+    $s1 = local[1]
+   
+    ret
+
+    # end of epilogue
+    
+---------------------------------------------------
+f:
+    # start of prologue
+    # 1. Pushing the frame
+    sw $fp,-8($sp)               # save $fp,  2 * 4 = 8
+    move $sp, $fp
+    subu $sp,$sp,36      # push stack frame, (2+3+2)*4 = 36
+    sw $ra,-4($fp)               # save the return address   1*4 = 4
+    
+    # 2. Saving registers:
+    sw $s0,-12($fp)            # save value of $s0  (3+0)*4 = 12
+    sw $s1,-16($fp)            # save value of $s1 (3+1)*4 = 16
+
+    # end of prologue
+    # ----------------------  
+    
+    
+    # start of body
+
+    add $s0, $a0, $a1
+    
+    # Call to function g
+    sw $a0,$fp             # save $a0 (variable p1)
+    sw $a1,4($fp)        # save $a1 (variable p2)    
+    lw $a0,4($fp)         # arg0 is variable p2
+    lw $a1,($fp)           # arg1 is variable p1
+    move $s0,$a2        # arg2 is x
+    jal g                       # call g
+    move $v0,$s1
+    
+    # end of body
+    # ----------------------    
+
+
+    # start of epilogue
+    # 0. Loading the return value
+    move $s1,$v0
+    
+    # 1. Restoring registers:
+    lw $s0,-12($fp)             # restore value of $s0  (3+0)*4 = 12
+    lw $s1,-16($fp)             # restore value of $s1 (3+1)*4 = 16
+
+    # 2. Popping the frame
+    lw $ra,-4($fp)              # restore the return address     1 * 4 = 4
+    lw $fp,-8($fp)              # restore $fp     2 * 4 = 8
+    addu $sp,$sp,36      # pop stack frame, (2+3+2)*4 = 36
+    
+    jr $ra                         # return
+    # end of epilogue
+
+---------------------------------------------------
+
+
+
+
+
