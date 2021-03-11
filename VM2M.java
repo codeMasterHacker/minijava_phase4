@@ -45,6 +45,16 @@ import cs132.vapor.ast.VVarRef.Register;
 import java.io.*;
 import java.util.*;
 
+class SortbyLine implements Comparator<Node>
+{
+    // Used for sorting in ascending order
+    @Override
+    public int compare(Node a, Node b)
+    {
+        return a.sourcePos.line - b.sourcePos.line;
+    }
+}
+
 public class VM2M 
 {
     public static void main(String[] args) 
@@ -103,12 +113,26 @@ public class VM2M
 
                 pushFrame(stackFrameSize);
 
+                Node[] instrsNlabels = new Node[vaporFunction.body.length + vaporFunction.labels.length];
+                System.arraycopy(vaporFunction.body, 0, instrsNlabels, 0, vaporFunction.body.length); 
+                System.arraycopy(vaporFunction.labels, 0, instrsNlabels, vaporFunction.body.length, vaporFunction.labels.length);
+                Arrays.sort(instrsNlabels, new SortbyLine());
+
                 StringBuilder mipsCode = new StringBuilder();
                 vaporMvisitor.setMipsCode(mipsCode);
 
-                for (int j = 0; j < vaporFunction.body.length; j++) 
+                for (int j = 0; j < instrsNlabels.length; j++) 
                 {
-                    vaporFunction.body[j].accept(vaporMvisitor);
+                    if (instrsNlabels[j] instanceof  VInstr)
+                    {
+                        VInstr body = (VInstr) instrsNlabels[j];
+                        body.accept(vaporMvisitor);
+                    }
+                    else
+                    {
+                        VCodeLabel label = (VCodeLabel) instrsNlabels[j];
+                        mipsCode.append("\t" + label.ident + ":\n");
+                    }
                 }
 
                 System.out.print(mipsCode.toString());

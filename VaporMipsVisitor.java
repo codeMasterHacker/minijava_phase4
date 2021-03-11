@@ -4,7 +4,6 @@ import cs132.util.IndentPrinter;
 
 import cs132.vapor.parser.*;
 import cs132.vapor.parser.VaporParser;
-import jdk.dynalink.beans.StaticClass;
 import cs132.vapor.ast.*;
 import cs132.vapor.ast.Node;
 import cs132.vapor.ast.VAddr;
@@ -285,7 +284,7 @@ public class VaporMipsVisitor <E extends Throwable> extends Visitor<E>
                     instruction = "li " + n.dest.toString() + " " + Integer.toString(result);
                 }
                 else if (!(n.args[0] instanceof VLitInt) && n.args[1] instanceof VLitInt)
-                    instruction = "subu " + n.dest.toString() + n.args[0].toString() + " " + n.args[1].toString();
+                    instruction = "subu " + n.dest.toString() + " " + n.args[0].toString() + " " + n.args[1].toString();
                 else
                     instruction = "";
                 
@@ -382,10 +381,12 @@ public class VaporMipsVisitor <E extends Throwable> extends Visitor<E>
                 $t1 = HeapAllocZ($t1)
                     move $a0 $t1
                     jal _heapAlloc
+                    move $t1 $v0
                 */
 
                 instruction = (n.args[0] instanceof VLitInt) ? "li $a0 " : "move $a0 ";
                 instruction += n.args[0].toString() + "\n\t\tjal _heapAlloc";
+                instruction += "\n\t\tmove " + n.dest.toString() + " $v0";
 
                 break;
             }
